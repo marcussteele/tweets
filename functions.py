@@ -3,6 +3,7 @@ import tweepy
 import os
 import re
 from nltk.stem import WordNetLemmatizer
+import string
 
 def create_database(database):
     conn = pg2.connect(dbname='postgres', user='postgres', host='localhost', port='5435')
@@ -92,6 +93,7 @@ def cleaning_tweets(tweet):
     that aren't letters.
     Returns a list a words that have been transformed.
     '''
+    lemm = WordNetLemmatizer()
     no_mentions = re.sub(r'@[A-Za-z0-9_.]+','',tweet)
     no_urls = re.sub('https?://[A-Za-z0-9./]+','',no_mentions)
     no_nextline = re.sub(r"\s+", " ", no_urls)
