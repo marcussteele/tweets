@@ -4,6 +4,7 @@ import os
 import re
 from nltk.stem import WordNetLemmatizer
 import string
+from nltk.corpus import stopwords
 
 def create_database(database):
     conn = pg2.connect(dbname='postgres', user='postgres', host='localhost', port='5435')
@@ -53,29 +54,28 @@ def connect_to_tweepy():
     api = tweepy.API(auth, wait_on_rate_limit=True)
     return api
 
-class MyStreamListener(tweepy.StreamListener):
-    def on_status(self,tweet):
-        user = tweet.id
-        loc = tweet.user.location
-        text = tweet.text
-        tweet_time = tweet.created_at
-        retweets = tweet.retweet_count
-        try:
-            full_text = tweet.extended_tweet["full_text"]
-        except:
-            full_text = 'No full text'
-        cursor.execute("INSERT INTO beer_tweets(userid,location,tweet,tweet_time,full_tweet,retweets) VALUES(%s,%s,%s,%s,%s,%s);",(user,loc,text,tweet_time,full_text,retweets))
-    def on_error(self, status_code):
-        if status_code == 420:
-            #returning False in on_data disconnects the stream
-            return False
 
-def streamer(api,keyword):
+def streamer(api,table,keywords):
+    class MyStreamListener(tweepy.StreamListener):
+        def on_status(self,tweet):
+            user = tweet.id
+            loc = tweet.user.location
+            text = tweet.text
+            tweet_time = tweet.created_at
+            try:
+                full_text = tweet.extended_tweet["full_text"]
+            except:
+                full_text = 'No full text'
+            cursor.execute("INSERT INTO %s (userid,location,tweet,tweet_time,full_tweet) VALUES(%s,%s,%s,%s,%s);",(table,user,loc,text,tweet_time,full_text))
+        def on_error(self, status_code):
+            if status_code == 420:
+                #returning False in on_data disconnects the stream
+                return False
     myStreamListener = MyStreamListener()
     while True:
         try:
             myStream = tweepy.Stream(auth = api.auth, listener=myStreamListener,tweet_mode='extended')
-            myStream.filter(track=['beer'])
+            myStream.filter(track=[keywords])
         except:
             print('Restarting Stream')
             continue
@@ -99,6 +99,7 @@ def cleaning_tweets(tweet):
     no_nextline = re.sub(r"\s+", " ", no_urls)
     lowered = no_nextline.lower()
     no_punct = lowered.translate(str.maketrans('', '', string.punctuation))
+    stop_words = set(stopwords.words('english'))
     no_stops = [lemm.lemmatize(word) for word in no_punct.split(' ') if word not in stop_words]
     no_empty = [w for w in no_stops if w]
     no_quotes = [''.join(let) for let in no_empty if let.isalpha()]
